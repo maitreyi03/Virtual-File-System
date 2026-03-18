@@ -1,0 +1,25 @@
+in
+cr foo
+cr bar
+op foo
+dr
+sk 1 10
+cl 1
+de foo
+dr
+
+in
+dr
+wm 0 abcdefghij
+cr foo
+op foo
+wr 1 0 5
+wr 1 5 2
+dr
+sk 1 0
+rd 1 10 3
+rm 0 20
+cl 1
+dr
+
+

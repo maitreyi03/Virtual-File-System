@@ -1,0 +1,182 @@
+system initialized
+abc created
+abc opened 1
+1 closed
+abc 0
+abc destroyed
+
+system initialized 
+
+abc created
+abc opened 1
+xx created
+p created
+xx opened 2
+1 closed
+p opened 1
+abc opened 3
+1 closed
+3 closed
+abc destroyed
+p destroyed
+xx 0
+
+system initialized 
+
+10 bytes written to M
+abc created
+abc opened 1
+2 bytes written to file 1
+3 bytes written to file 1
+position is 0
+5 bytes read from file 1
+01234
+
+system initialized 
+
+10 bytes written to M
+abc created
+abc opened 1
+5 bytes written to file 1
+position is 0
+5 bytes read from file 1
+34567
+
+system initialized 
+
+abc created
+abc opened 1
+300 bytes written to file 1
+250 bytes written to file 1
+abc 550
+
+system initialized 
+
+abc created
+abc opened 1
+512 bytes written to file 1
+512 bytes written to file 1
+500 bytes written to file 1
+12 bytes written to file 1
+abc 1536
+
+system initialized 
+
+100 bytes written to M
+abc created
+abc opened 1
+400 bytes written to file 1
+100 bytes written to file 1
+100 bytes written to file 1
+position is 0
+5 bytes read from file 1
+5 bytes read from file 1
+abcdefghij
+position is 497
+5 bytes read from file 1
+abcdefghijHIJab
+
+system initialized 
+
+10 bytes written to M
+abc created
+abc opened 1
+10 bytes written to file 1
+position is 0
+10 bytes read from file 1
+abcdefghijabcdefghij
+1 closed
+abc opened 1
+10 bytes read from file 1
+abcdefghijabcdefghijabcdefghij
+
+system initialized 
+
+12 bytes written to M
+abc created
+abc opened 1
+9 bytes written to file 1
+position is 3
+3 bytes written to file 1
+position is 0
+9 bytes read from file 1
+abcDEFghi
+
+system initialized 
+
+6 bytes written to M
+abc created
+abc opened 1
+3 bytes written to file 1
+1 closed
+abc opened 1
+position is 3
+3 bytes written to file 1
+position is 0
+6 bytes read from file 1
+abcdef
+
+system initialized 
+
+6 bytes written to M
+abc created
+abc opened 1
+3 bytes written to file 1
+position is 0
+3 bytes read from file 1
+abcdef
+
+system initialized 
+
+abc created
+xx created
+error
+
+system initialized 
+
+abc created
+xx created
+error
+
+system initialized 
+
+abc created
+error
+
+system initialized 
+
+abc created
+xx created
+abc opened 1
+error
+
+system initialized 
+
+abc created
+abc opened 1
+error
+
+system initialized 
+
+abc created
+abc opened 1
+error
+
+system initialized 
+
+abc created
+abc opened 1
+100 bytes written to file 1
+position is 0
+error
+
+system initialized 
+
+a created
+a opened 1
+b created
+b opened 2
+c created
+c opened 3
+d created
+error

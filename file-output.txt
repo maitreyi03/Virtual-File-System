@@ -1,0 +1,22 @@
+system initialized
+foo created
+bar created
+foo opened 1
+foo 0 bar 0
+error
+1 closed
+foo destroyed
+bar 0
+system initialized
+
+10 bytes written to M
+foo created
+foo opened 1
+5 bytes written to file 1
+2 bytes written to file 1
+foo 7
+position is 0
+3 bytes read from file 1
+abcdefghijabc
+1 closed
+foo 7
