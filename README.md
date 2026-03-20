@@ -1,95 +1,160 @@
-# Virtual File System — Java Rewrite
-### CS143B Project 1 — Improved Architecture
+# Virtual File System Simulator
+
+### CS143B · Project 1 — Maitreyi Pareek (maitreyp · 76592576)
 
 ---
 
-## Project structure
+## Project overview
 
-```
-vfs/
-├── Config.java            Interface — all magic numbers in one place
-├── FileSystemException.java Exception hierarchy (NotFound, NoSpace, etc.)
-├── Disk.java              Raw block device simulation
-├── Bitmap.java            Free-block allocation bitmap
-├── Descriptor.java        Single file descriptor (inside DescriptorTable.java)
-├── DescriptorTable.java   All descriptors + disk persistence
-├── OftEntry.java          One OFT slot (inside OpenFileTable.java)
-├── OpenFileTable.java     Open File Table management
-├── Directory.java         Name ↔ descriptor mapping on disk block 7
-├── FileSystem.java        Public API — create/destroy/open/close/read/write/seek
-└── Shell.java             Command parser + main entry point
-```
+This project implements a virtual file system that simulates a toy disk using flat arrays. It supports creating, opening, reading, writing, seeking, closing, and destroying files through a simple command interface. The project is available in three forms:
 
----
-
-## How to compile and run
-
-```bash
-# From the directory containing the vfs/ folder:
-javac vfs/*.java
-
-# Run (will prompt for an input file path):
-java vfs.Shell
-# Enter: FS-input-1.txt
-```
-
----
-
-## Command reference
-
-| Command | Arguments | Description |
-|---------|-----------|-------------|
-| `in`    | —         | Re-initialise the file system |
-| `cr`    | name      | Create a new file (max 3-char alphanumeric name) |
-| `de`    | name      | Destroy a file (must not be open) |
-| `op`    | name      | Open a file → prints `name opened <index>` |
-| `cl`    | index     | Close open file at OFT index |
-| `rd`    | idx mpos cnt | Read `cnt` bytes from file to memory[mpos] |
-| `wr`    | idx mpos cnt | Write `cnt` bytes from memory[mpos] to file |
-| `sk`    | idx pos   | Seek file position pointer to `pos` |
-| `dr`    | —         | List directory: `name size ...` |
-| `wm`    | pos data  | Write string `data` into memory at `pos` |
-| `rm`    | pos cnt   | Read `cnt` chars from memory at `pos` |
-
----
-
-## Improvements over the Python version
-
-### Separation of concerns
-The Python code was a single 570-line class mixing disk simulation, memory
-management, file I/O, directory handling, and command parsing together.
-The Java version splits these into dedicated classes with clear boundaries.
-
-### Typed error handling
-Python used bare `try/except → return "error"`, swallowing all errors silently.
-Java uses a `FileSystemException` hierarchy so the *kind* of error is
-preserved internally and only collapsed to "error" at the Shell boundary.
-This makes debugging far easier.
-
-### Typed data objects
-Python represented descriptors as `[int, int, int, int]` raw arrays and
-OFT entries as plain dicts. Java uses `Descriptor` and `OftEntry` objects
-with named fields — no more `entry['descriptor_index']` vs `desc[0]` confusion.
-
-### Centralised configuration
-All constants (block counts, sizes, limits) live in the `Config` interface.
-Changing `OFT_SIZE` or `MAX_FILE_BLOCKS` now propagates everywhere
-automatically.
-
-### Cleaner directory management
-The `Directory` class encapsulates all entry read/write/compact logic,
-making it straightforward to later extend with subdirectory support.
+| Deliverable           | Location             | How to run                    |
+| --------------------- | -------------------- | ----------------------------- |
+| Python implementation | `main.py`            | `python3 main.py`             |
+| Java implementation   | `java/vfs/*.java`    | see Java section below        |
+| Web visualizer        | `vfs-web/index.html` | open in browser               |
+| Standalone visualizer | `vfs-simulator.html` | open in browser (single file) |
 
 ---
 
 ## Disk layout
 
 ```
-Block 0       : Bitmap (1 bit per block)
-Blocks 1–6    : File descriptors (128 descriptors per block × 6 = 768 slots,
-                capped at MAX_DESCRIPTORS = 192)
-Block 7       : Directory entries (8 bytes each: 4-char name + 4-byte index)
-Blocks 8–63   : Data blocks (55 × 512 = 28 160 bytes usable storage)
+Block 0       Bitmap            1 bit per block, packed into bytes
+Blocks 1–6    File descriptors  128 descriptors × 6 blocks = 768 slots (capped at 192)
+Block 7       Directory         12 bytes per entry: 10-char name + descriptor index
+Blocks 8–63   Data blocks       55 × 512 = 28,160 bytes of usable storage
 ```
 
-Each file may occupy at most 3 data blocks (1 536 bytes max).
+Each file may occupy at most **3 data blocks** (1,536 bytes max).
+
+---
+
+## Command reference
+
+| Command | Syntax                      | Description                                   |
+| ------- | --------------------------- | --------------------------------------------- |
+| `in`    | `in`                        | Re-initialise the file system                 |
+| `cr`    | `cr <name>`                 | Create a new file                             |
+| `de`    | `de <name>`                 | Destroy a file — must be closed first         |
+| `op`    | `op <name>`                 | Open a file → prints `name opened <slot#>`    |
+| `cl`    | `cl <slot#>`                | Close file at OFT slot (**number**, not name) |
+| `wm`    | `wm <pos> <string>`         | Write string into memory buffer M at byte pos |
+| `rm`    | `rm <pos> <count>`          | Read count bytes from memory at pos           |
+| `wr`    | `wr <slot#> <mpos> <count>` | Write count bytes from M into open file       |
+| `rd`    | `rd <slot#> <mpos> <count>` | Read count bytes from open file into M        |
+| `sk`    | `sk <slot#> <pos>`          | Seek file position pointer to byte pos        |
+| `dr`    | `dr`                        | List all files and their sizes                |
+
+**Common mistakes**
+
+- `cl` takes an OFT slot number — `cl 1` not `cl myfile`
+- `wr`, `rd`, `sk` first argument is always the OFT slot index
+- `de` will return `error` if the file is still open — run `cl` first
+
+---
+
+## Python
+
+### How to run
+
+```bash
+python3 main.py
+# Enter the file path when prompted, e.g.: FS-input-1.txt
+```
+
+Output is printed to stdout and appended to `output.txt`.
+
+---
+
+## Java
+
+### File structure
+
+```
+java/
+└── vfs/
+    ├── Config.java              Constants (block sizes, limits)
+    ├── FileSystemException.java Typed exception hierarchy
+    ├── Disk.java                Raw block device simulation
+    ├── Bitmap.java              Free-block allocation bitmap
+    ├── DescriptorTable.java     File metadata + disk persistence
+    ├── OpenFileTable.java       OFT slot management
+    ├── Directory.java           Name ↔ descriptor mapping (block 7)
+    ├── FileSystem.java          Public API
+    └── Shell.java               Command parser + main entry point
+```
+
+### How to compile and run
+
+Make sure you are in the `java/` folder (the folder that **contains** the `vfs/` subfolder), then:
+
+```bash
+# Compile — run from inside java/
+cd java
+javac vfs/*.java
+
+# Run
+java vfs.Shell
+# Enter input file path when prompted, e.g.: ../FS-input-1.txt
+```
+
+> **Note:** The glob `vfs/*.java` only works when your current directory is `java/`.  
+> If you are already inside `java/vfs/`, go up one level first: `cd ..`
+
+Output is printed to stdout and written to `output.txt` in the working directory.
+
+---
+
+## Web visualizer
+
+An interactive browser-based simulator that shows the disk bitmap, open file table, directory, and memory buffer updating in real time as you type commands.
+
+### Two versions
+
+**`vfs-web/`** — organised source (recommended for development)
+
+```
+vfs-web/
+├── index.html        HTML structure only
+├── css/
+│   └── styles.css    All visual styles
+└── js/
+    ├── fs.js         File system engine (no DOM access)
+    └── ui.js         Rendering + shell interaction
+```
+
+> To open `vfs-web/index.html` locally, use a simple local server — browsers block relative file paths under the `file://` protocol:
+>
+> ```bash
+> # Python (run from inside vfs-web/)
+> cd vfs-web
+> python3 -m http.server 8080
+> # Then open http://localhost:8080 in your browser
+> ```
+
+**`vfs-simulator.html`** — single self-contained file, works by double-click with no server needed. Same code as `vfs-web/`, just inlined. Use this for submitting or sharing.
+
+### Running the demo
+
+Click **▶ run full sequence** in the browser to watch a complete create → open → write → read → close → destroy cycle play out step by step with annotations.
+
+---
+
+## Input file format
+
+Commands are listed one per line. Blank lines are ignored. The `in` command resets the system and starts a new session (output is separated by blank lines).
+
+```
+in
+cr abc
+op abc
+wm 0 helloworld
+wr 1 0 10
+sk 1 0
+rd 1 20 10
+rm 20 10
+dr
+cl 1
+de abc
+```
