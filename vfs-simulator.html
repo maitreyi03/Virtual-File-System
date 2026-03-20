@@ -1,0 +1,835 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Virtual File System · CS143B</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet"/>
+<style>
+:root {
+  --bg:       #0d0f14;
+  --surface:  #151820;
+  --surface2: #1c202c;
+  --surface3: #232837;
+  --border:   #2a2f3f;
+  --border2:  #353c52;
+  --text:     #e2e6f0;
+  --muted:    #7a8099;
+  --dim:      #454d66;
+  --accent:   #7c8fff;
+  --accent2:  #5c6be0;
+  --green:    #4ade80;
+  --green-bg: #0d2b1a;
+  --orange:   #fb923c;
+  --orange-bg:#2b1a0a;
+  --red:      #f87171;
+  --red-bg:   #2b0f0f;
+  --blue:     #60a5fa;
+  --blue-bg:  #0a1a2b;
+  --yellow:   #fbbf24;
+  --mono:     'JetBrains Mono', monospace;
+  --sans:     'DM Sans', sans-serif;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-size: 14px; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  min-height: 100vh;
+  padding: 0;
+}
+
+/* ── Header ── */
+.header {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 14px 24px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.header-logo {
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--accent);
+  letter-spacing: .04em;
+}
+.header-title {
+  font-size: 13px;
+  color: var(--muted);
+  font-weight: 300;
+}
+.header-badge {
+  margin-left: auto;
+  font-family: var(--mono);
+  font-size: 11px;
+  padding: 3px 10px;
+  border: 1px solid var(--border2);
+  border-radius: 20px;
+  color: var(--muted);
+}
+
+/* ── Layout ── */
+.layout {
+  display: grid;
+  grid-template-columns: 420px 1fr;
+  grid-template-rows: auto;
+  height: calc(100vh - 53px);
+}
+.left-col {
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.right-col {
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  gap: 0;
+}
+
+/* ── Shell ── */
+.shell {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.shell-toolbar {
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.shell-toolbar-label {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--accent);
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+.reset-btn {
+  margin-left: auto;
+  font-family: var(--mono);
+  font-size: 11px;
+  padding: 4px 10px;
+  background: transparent;
+  border: 1px solid var(--border2);
+  border-radius: 4px;
+  color: var(--muted);
+  cursor: pointer;
+  transition: all .15s;
+}
+.reset-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+.log-area {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px 0;
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.7;
+}
+.log-entry { padding: 1px 16px; display: flex; gap: 10px; align-items: baseline; }
+.log-entry:hover { background: var(--surface2); }
+.log-prompt { color: var(--dim); user-select: none; }
+.log-cmd { color: var(--text); }
+.log-result-ok { color: var(--green); }
+.log-result-err { color: var(--red); }
+.log-result-info { color: var(--yellow); }
+.log-welcome { padding: 12px 16px; color: var(--dim); font-size: 11px; line-height: 1.9; }
+
+.input-area {
+  border-top: 1px solid var(--border);
+  padding: 10px 16px;
+}
+.input-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--surface2);
+  border: 1px solid var(--border2);
+  border-radius: 6px;
+  padding: 0 12px;
+  transition: border-color .15s;
+}
+.input-row:focus-within { border-color: var(--accent2); }
+.input-prompt { color: var(--accent); font-family: var(--mono); font-size: 13px; font-weight: 700; user-select: none; }
+.cmd-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 13px;
+  padding: 9px 0;
+  caret-color: var(--accent);
+}
+.run-btn {
+  background: var(--accent2);
+  border: none;
+  border-radius: 4px;
+  color: #fff;
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 700;
+  padding: 5px 12px;
+  cursor: pointer;
+  letter-spacing: .04em;
+  transition: background .15s;
+}
+.run-btn:hover { background: var(--accent); }
+
+.hints-area {
+  padding: 8px 16px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  border-top: 1px solid var(--border);
+}
+.hint-chip {
+  font-family: var(--mono);
+  font-size: 11px;
+  padding: 3px 9px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  color: var(--muted);
+  cursor: pointer;
+  transition: all .12s;
+  white-space: nowrap;
+}
+.hint-chip:hover { border-color: var(--accent2); color: var(--accent); background: var(--surface3); }
+
+/* ── Right panels ── */
+.panel-section {
+  border-bottom: 1px solid var(--border);
+  padding: 16px 20px;
+}
+.panel-section:last-child { border-bottom: none; }
+.section-label {
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.section-label::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+/* ── Stats ── */
+.stats-row { display: grid; grid-template-columns: repeat(3,1fr); gap: 10px; }
+.stat-card {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 14px;
+  text-align: center;
+}
+.stat-val { font-family: var(--mono); font-size: 26px; font-weight: 700; line-height: 1; }
+.stat-val.green { color: var(--green); }
+.stat-val.orange { color: var(--orange); }
+.stat-val.blue { color: var(--blue); }
+.stat-lbl { font-size: 11px; color: var(--muted); margin-top: 4px; }
+
+/* ── Bitmap ── */
+.bitmap-grid {
+  display: grid;
+  grid-template-columns: repeat(16,1fr);
+  gap: 3px;
+}
+.bblock {
+  aspect-ratio: 1;
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--mono);
+  font-size: 7px;
+  font-weight: 700;
+  transition: background .2s, transform .1s;
+  cursor: default;
+  position: relative;
+}
+.bblock:hover { transform: scale(1.15); z-index: 10; }
+.bblock.sys   { background: var(--blue-bg);   color: var(--blue);   border: 1px solid #1a3a5c; }
+.bblock.used  { background: var(--orange-bg); color: var(--orange); border: 1px solid #4a2a0a; }
+.bblock.free  { background: var(--surface2);  color: var(--dim);    border: 1px solid var(--border); }
+.bblock.new-used { animation: pulse-block .4s ease-out; }
+@keyframes pulse-block {
+  0%   { transform: scale(1.3); background: #fb923c; }
+  100% { transform: scale(1); }
+}
+.bitmap-legend {
+  display: flex; gap: 14px; margin-top: 8px; font-size: 11px; color: var(--muted);
+}
+.legend-dot {
+  width: 8px; height: 8px; border-radius: 2px; display: inline-block; margin-right: 4px; vertical-align: middle;
+}
+
+/* ── OFT ── */
+.oft-table { width: 100%; border-collapse: collapse; }
+.oft-table th {
+  font-family: var(--mono);
+  font-size: 10px; font-weight: 700;
+  color: var(--dim); text-align: left;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--border);
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+.oft-table td {
+  font-family: var(--mono);
+  font-size: 12px;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border);
+  transition: background .15s;
+}
+.oft-table tr:last-child td { border-bottom: none; }
+.oft-table tr:hover td { background: var(--surface2); }
+.slot-dir   { color: var(--blue); }
+.slot-open  { color: var(--green); }
+.slot-free  { color: var(--dim); }
+.slot-badge {
+  display: inline-block;
+  font-size: 9px; font-weight: 700;
+  padding: 1px 6px; border-radius: 20px;
+  letter-spacing: .04em; text-transform: uppercase;
+}
+.badge-dir  { background: var(--blue-bg);  color: var(--blue);  border: 1px solid #1a3a5c; }
+.badge-open { background: var(--green-bg); color: var(--green); border: 1px solid #0d3d1a; }
+.badge-free { background: var(--surface3); color: var(--dim);   border: 1px solid var(--border); }
+
+/* ── Directory ── */
+.dir-table { width: 100%; border-collapse: collapse; }
+.dir-table th {
+  font-family: var(--mono); font-size: 10px; font-weight: 700;
+  color: var(--dim); text-align: left; padding: 4px 8px;
+  border-bottom: 1px solid var(--border);
+  text-transform: uppercase; letter-spacing: .06em;
+}
+.dir-table td {
+  font-family: var(--mono); font-size: 12px;
+  padding: 6px 8px; border-bottom: 1px solid var(--border);
+  transition: background .15s;
+}
+.dir-table tr:last-child td { border-bottom: none; }
+.dir-table tr:hover td { background: var(--surface2); }
+.dir-empty { font-size: 12px; color: var(--dim); font-style: italic; font-family: var(--mono); }
+.filename { color: var(--yellow); }
+.desc-idx  { color: var(--muted); }
+.file-size { color: var(--orange); }
+
+/* ── Memory ── */
+.mem-bytes-grid {
+  display: grid;
+  grid-template-columns: repeat(32, 1fr);
+  gap: 2px;
+  margin-bottom: 10px;
+}
+.mbyte {
+  aspect-ratio: 1;
+  border-radius: 2px;
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--mono); font-size: 7px; font-weight: 700;
+  border: 1px solid var(--border);
+  background: var(--surface2);
+  color: var(--dim);
+  transition: background .15s, color .15s;
+  cursor: default;
+}
+.mbyte.active {
+  background: #14472a;
+  border-color: #1d6b3e;
+  color: var(--green);
+}
+.mbyte.recent {
+  animation: pop-byte .35s ease-out;
+}
+@keyframes pop-byte {
+  0%   { background: var(--accent2); color: #fff; transform: scale(1.25); }
+  100% { }
+}
+.mem-string-row {
+  display: flex; align-items: center; gap: 10px;
+  font-family: var(--mono); font-size: 12px;
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 6px; padding: 8px 12px;
+}
+.mem-string-label { color: var(--dim); font-size: 11px; }
+.mem-string-val { color: var(--green); }
+
+/* ── Scrollbar styling ── */
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--dim); }
+
+/* ── Responsive ── */
+@media (max-width: 900px) {
+  .layout { grid-template-columns: 1fr; grid-template-rows: 60vh auto; height: auto; }
+  .left-col { height: 60vh; }
+  .right-col { height: auto; overflow-y: visible; }
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <span class="header-logo">VFS</span>
+  <span class="header-title">Virtual File System Simulator</span>
+  <span class="header-badge">CS143B · Project 1</span>
+</div>
+
+<div class="layout">
+
+  <!-- ── Left: Shell ── -->
+  <div class="left-col">
+    <div class="shell">
+      <div class="shell-toolbar">
+        <span class="shell-toolbar-label">Shell</span>
+        <button class="reset-btn" onclick="resetFS()">↺ Reset</button>
+      </div>
+      <div class="log-area" id="log">
+        <div class="log-welcome">
+          Virtual file system initialized.<br>
+          Type commands below or click a hint chip to get started.
+        </div>
+      </div>
+      <div class="input-area">
+        <div class="input-row">
+          <span class="input-prompt">$</span>
+          <input class="cmd-input" id="cmd" placeholder="cr myfile" autocomplete="off" spellcheck="false"
+            onkeydown="if(event.key==='Enter')run()"/>
+          <button class="run-btn" onclick="run()">RUN</button>
+        </div>
+      </div>
+      <div class="hints-area">
+        <span class="hint-chip" onclick="hint('in')">in</span>
+        <span class="hint-chip" onclick="hint('cr abc')">cr abc</span>
+        <span class="hint-chip" onclick="hint('cr xx')">cr xx</span>
+        <span class="hint-chip" onclick="hint('op abc')">op abc</span>
+        <span class="hint-chip" onclick="hint('wm 0 helloworld')">wm 0 helloworld</span>
+        <span class="hint-chip" onclick="hint('wr 1 0 10')">wr 1 0 10</span>
+        <span class="hint-chip" onclick="hint('sk 1 0')">sk 1 0</span>
+        <span class="hint-chip" onclick="hint('rd 1 20 10')">rd 1 20 10</span>
+        <span class="hint-chip" onclick="hint('rm 20 10')">rm 20 10</span>
+        <span class="hint-chip" onclick="hint('dr')">dr</span>
+        <span class="hint-chip" onclick="hint('cl 1')">cl 1</span>
+        <span class="hint-chip" onclick="hint('de abc')">de abc</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Right: Visualizations ── -->
+  <div class="right-col">
+
+    <!-- Stats -->
+    <div class="panel-section">
+      <div class="section-label">Overview</div>
+      <div class="stats-row">
+        <div class="stat-card">
+          <div class="stat-val green" id="s-free">56</div>
+          <div class="stat-lbl">free blocks</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-val orange" id="s-files">0</div>
+          <div class="stat-lbl">files</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-val blue" id="s-open">0</div>
+          <div class="stat-lbl">open</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bitmap -->
+    <div class="panel-section">
+      <div class="section-label">Disk Bitmap  <span style="font-size:10px;font-weight:400;letter-spacing:0;text-transform:none;color:var(--dim)">64 blocks × 512 bytes</span></div>
+      <div class="bitmap-grid" id="bitmap"></div>
+      <div class="bitmap-legend">
+        <span><span class="legend-dot" style="background:var(--blue-bg);border:1px solid #1a3a5c"></span>system (0–7)</span>
+        <span><span class="legend-dot" style="background:var(--orange-bg);border:1px solid #4a2a0a"></span>data used</span>
+        <span><span class="legend-dot" style="background:var(--surface2);border:1px solid var(--border)"></span>free</span>
+      </div>
+    </div>
+
+    <!-- OFT -->
+    <div class="panel-section">
+      <div class="section-label">Open File Table  <span style="font-size:10px;font-weight:400;letter-spacing:0;text-transform:none;color:var(--dim)">4 slots · slot 0 = directory</span></div>
+      <table class="oft-table">
+        <thead>
+          <tr>
+            <th>Slot</th>
+            <th>State</th>
+            <th>File</th>
+            <th>Position</th>
+            <th>Size</th>
+            <th>Desc#</th>
+          </tr>
+        </thead>
+        <tbody id="oft-body"></tbody>
+      </table>
+    </div>
+
+    <!-- Directory -->
+    <div class="panel-section">
+      <div class="section-label">Directory  <span style="font-size:10px;font-weight:400;letter-spacing:0;text-transform:none;color:var(--dim)">block 7 · 8 bytes/entry</span></div>
+      <table class="dir-table">
+        <thead>
+          <tr><th>Name</th><th>Desc #</th><th>Size (bytes)</th><th>Blocks</th></tr>
+        </thead>
+        <tbody id="dir-body"></tbody>
+      </table>
+    </div>
+
+    <!-- Memory -->
+    <div class="panel-section">
+      <div class="section-label">Memory Buffer M  <span style="font-size:10px;font-weight:400;letter-spacing:0;text-transform:none;color:var(--dim)">first 64 bytes shown</span></div>
+      <div class="mem-bytes-grid" id="mem-grid"></div>
+      <div class="mem-string-row">
+        <span class="mem-string-label">M as string:</span>
+        <span class="mem-string-val" id="mem-str">(empty)</span>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+const BLOCK_COUNT=64,BLOCK_SIZE=512,MAX_FILE_BLOCKS=3;
+const MAX_FILENAME_LEN=3,MAX_DESCRIPTORS=192,DESCRIPTOR_SIZE=4;
+const ENTRY_SIZE=8,OFT_SIZE=4,DIR_BLOCK=7,DATA_START=8;
+
+let disk,bitmap,descriptors,oft,memory,prevBitmap;
+
+function newBuf(){return new Array(BLOCK_SIZE).fill(0);}
+
+function initFS(){
+  disk=Array.from({length:BLOCK_COUNT},()=>new Array(BLOCK_SIZE).fill(0));
+  bitmap=new Array(BLOCK_COUNT).fill(false);
+  for(let i=0;i<DATA_START;i++)bitmap[i]=true;
+  prevBitmap=bitmap.slice();
+  descriptors=Array.from({length:MAX_DESCRIPTORS},()=>({size:-1,blocks:[0,0,0]}));
+  descriptors[0]={size:0,blocks:[DIR_BLOCK,0,0]};
+  oft=Array.from({length:OFT_SIZE},()=>({buffer:newBuf(),pos:-1,size:0,desc:-1}));
+  oft[0]={buffer:newBuf(),pos:0,size:0,desc:0};
+  memory=new Array(BLOCK_SIZE).fill(0);
+  saveBM();saveDesc();
+  return 'system initialized';
+}
+
+function saveBM(){const b=newBuf();for(let i=0;i<BLOCK_COUNT;i++)if(bitmap[i])b[Math.floor(i/8)]|=(1<<(i%8));disk[0]=b;}
+function saveDesc(){
+  for(let blk=1;blk<=6;blk++){
+    const b=newBuf(),base=(blk-1)*128;
+    for(let i=0;i<128&&(base+i)<MAX_DESCRIPTORS;i++){
+      const d=descriptors[base+i];
+      b[i*DESCRIPTOR_SIZE]=d.size;b[i*DESCRIPTOR_SIZE+1]=d.blocks[0];
+      b[i*DESCRIPTOR_SIZE+2]=d.blocks[1];b[i*DESCRIPTOR_SIZE+3]=d.blocks[2];
+    }
+    disk[blk]=b;
+  }
+}
+function saveDirBlock(){disk[DIR_BLOCK]=oft[0].buffer.slice();}
+
+function freeBlock(){for(let i=DATA_START;i<BLOCK_COUNT;i++)if(!bitmap[i])return i;return -1;}
+function freeDesc(){for(let i=1;i<MAX_DESCRIPTORS;i++)if(descriptors[i].size===-1)return i;return -1;}
+function freeSlot(){for(let i=1;i<OFT_SIZE;i++)if(oft[i].pos===-1)return i;return -1;}
+
+function findFile(name){
+  const count=Math.floor(oft[0].size/ENTRY_SIZE);
+  for(let i=0;i<count;i++){
+    const base=i*ENTRY_SIZE;let n='';
+    for(let j=0;j<4;j++){const c=oft[0].buffer[base+j];if(c)n+=String.fromCharCode(c);}
+    if(n===name)return oft[0].buffer[base+4];
+  }
+  return -1;
+}
+function validName(n){return n&&n.length>0&&n.length<=MAX_FILENAME_LEN&&/^[a-zA-Z0-9]+$/.test(n);}
+
+function getName(oftSlot, descIdx){
+  const count=Math.floor(oft[0].size/ENTRY_SIZE);
+  for(let i=0;i<count;i++){
+    const base=i*ENTRY_SIZE;
+    if(oft[0].buffer[base+4]===descIdx){
+      let n='';for(let j=0;j<4;j++){const c=oft[0].buffer[base+j];if(c)n+=String.fromCharCode(c);}
+      return n;
+    }
+  }
+  return '?';
+}
+
+function dispatch(line){
+  const parts=line.trim().split(/\s+/);
+  const cmd=parts[0];
+  try{
+    if(cmd==='in') return initFS();
+    if(cmd==='cr'&&parts.length===2) return create(parts[1]);
+    if(cmd==='de'&&parts.length===2) return destroy(parts[1]);
+    if(cmd==='op'&&parts.length===2) return openFile(parts[1]);
+    if(cmd==='cl'&&parts.length===2) return closeFile(+parts[1]);
+    if(cmd==='rd'&&parts.length===4) return read(+parts[1],+parts[2],+parts[3]);
+    if(cmd==='wr'&&parts.length===4) return writeFile(+parts[1],+parts[2],+parts[3]);
+    if(cmd==='sk'&&parts.length===3) return seek(+parts[1],+parts[2]);
+    if(cmd==='dr'&&parts.length===1) return directory();
+    if(cmd==='wm'&&parts.length>=3)  return writeMem(+parts[1],parts.slice(2).join(' '));
+    if(cmd==='rm'&&parts.length===3) return readMem(+parts[1],+parts[2]);
+    return 'error';
+  }catch(e){return 'error';}
+}
+
+function create(name){
+  if(!validName(name))return 'error';
+  if(findFile(name)!==-1)return 'error';
+  const di=freeDesc();if(di===-1)return 'error';
+  descriptors[di]={size:0,blocks:[0,0,0]};
+  const pos=oft[0].size;
+  if(pos+ENTRY_SIZE>BLOCK_SIZE){descriptors[di].size=-1;return 'error';}
+  for(let i=0;i<4;i++)oft[0].buffer[pos+i]=(i<name.length)?name.charCodeAt(i):0;
+  oft[0].buffer[pos+4]=di;
+  oft[0].size+=ENTRY_SIZE;
+  saveDesc();saveDirBlock();
+  return name+' created';
+}
+function destroy(name){
+  const di=findFile(name);if(di===-1)return 'error';
+  for(let i=1;i<OFT_SIZE;i++)if(oft[i].desc===di)return 'error';
+  for(const b of descriptors[di].blocks)if(b)bitmap[b]=false;
+  descriptors[di]={size:-1,blocks:[0,0,0]};
+  const count=Math.floor(oft[0].size/ENTRY_SIZE);
+  for(let i=0;i<count;i++){
+    const base=i*ENTRY_SIZE;let n='';
+    for(let j=0;j<4;j++){const c=oft[0].buffer[base+j];if(c)n+=String.fromCharCode(c);}
+    if(n===name){
+      for(let j=base;j<oft[0].size-ENTRY_SIZE;j++)oft[0].buffer[j]=oft[0].buffer[j+ENTRY_SIZE];
+      for(let j=oft[0].size-ENTRY_SIZE;j<oft[0].size;j++)oft[0].buffer[j]=0;
+      oft[0].size-=ENTRY_SIZE;break;
+    }
+  }
+  saveBM();saveDesc();saveDirBlock();
+  return name+' destroyed';
+}
+function openFile(name){
+  const di=findFile(name);if(di===-1)return 'error';
+  for(let i=0;i<OFT_SIZE;i++)if(oft[i].desc===di)return 'error';
+  const slot=freeSlot();if(slot===-1)return 'error';
+  oft[slot]={buffer:newBuf(),pos:0,size:descriptors[di].size,desc:di};
+  if(descriptors[di].blocks[0])oft[slot].buffer=disk[descriptors[di].blocks[0]].slice();
+  return name+' opened '+slot;
+}
+function closeFile(idx){
+  if(idx<1||idx>=OFT_SIZE||oft[idx].pos===-1)return 'error';
+  const e=oft[idx];
+  const bi=Math.max(0,Math.floor((Math.max(e.pos-1,0))/BLOCK_SIZE));
+  if(bi<MAX_FILE_BLOCKS){const blk=descriptors[e.desc].blocks[bi];if(blk)disk[blk]=e.buffer.slice();}
+  descriptors[e.desc].size=e.size;saveDesc();
+  oft[idx]={buffer:newBuf(),pos:-1,size:0,desc:-1};
+  return idx+' closed';
+}
+function read(idx,mpos,count){
+  if(idx<1||idx>=OFT_SIZE||oft[idx].pos===-1)return 'error';
+  if(mpos<0||count<0||mpos+count>BLOCK_SIZE)return 'error';
+  const e=oft[idx];let n=0;
+  while(n<count&&e.pos<e.size){
+    const bi=Math.floor(e.pos/BLOCK_SIZE),off=e.pos%BLOCK_SIZE;
+    if(off===0&&n>0){const blk=descriptors[e.desc].blocks[bi];if(blk)e.buffer=disk[blk].slice();}
+    memory[mpos+n]=e.buffer[off];n++;e.pos++;
+  }
+  return n+' bytes read from file '+idx;
+}
+function writeFile(idx,mpos,count){
+  if(idx<1||idx>=OFT_SIZE||oft[idx].pos===-1)return 'error';
+  if(mpos<0||count<0||mpos+count>BLOCK_SIZE)return 'error';
+  const e=oft[idx];let n=0;
+  while(n<count){
+    const bi=Math.floor(e.pos/BLOCK_SIZE);if(bi>=MAX_FILE_BLOCKS)break;
+    const off=e.pos%BLOCK_SIZE;
+    if(off===0&&n>0){
+      const pb=Math.floor((e.pos-1)/BLOCK_SIZE);
+      const pblk=descriptors[e.desc].blocks[pb];if(pblk)disk[pblk]=e.buffer.slice();
+    }
+    if(off===0&&descriptors[e.desc].blocks[bi]===0){
+      const nb=freeBlock();if(nb===-1)break;
+      bitmap[nb]=true;descriptors[e.desc].blocks[bi]=nb;e.buffer=newBuf();
+    }
+    e.buffer[off]=memory[mpos+n];n++;e.pos++;
+    if(e.pos>e.size)e.size=e.pos;
+  }
+  if(n>0){const lb=Math.floor((e.pos-1)/BLOCK_SIZE);const lblk=descriptors[e.desc].blocks[lb];if(lblk)disk[lblk]=e.buffer.slice();}
+  descriptors[e.desc].size=e.size;saveBM();saveDesc();
+  return n+' bytes written to file '+idx;
+}
+function seek(idx,pos){
+  if(idx<1||idx>=OFT_SIZE||oft[idx].pos===-1)return 'error';
+  const e=oft[idx];if(pos<0||pos>e.size)return 'error';
+  const ob=Math.floor(e.pos/BLOCK_SIZE),nb=Math.floor(pos/BLOCK_SIZE);
+  if(ob!==nb){
+    const oblk=descriptors[e.desc].blocks[ob];if(oblk)disk[oblk]=e.buffer.slice();
+    const nblk=nb<MAX_FILE_BLOCKS?descriptors[e.desc].blocks[nb]:0;
+    e.buffer=nblk?disk[nblk].slice():newBuf();
+  }
+  e.pos=pos;return 'position is '+pos;
+}
+function directory(){
+  const count=Math.floor(oft[0].size/ENTRY_SIZE);
+  if(!count)return '(empty)';
+  return Array.from({length:count},(_,i)=>{
+    const base=i*ENTRY_SIZE;let n='';
+    for(let j=0;j<4;j++){const c=oft[0].buffer[base+j];if(c)n+=String.fromCharCode(c);}
+    const di=oft[0].buffer[base+4];
+    return n+' '+descriptors[di].size;
+  }).join('  ');
+}
+function writeMem(pos,data){
+  if(pos<0||pos+data.length>BLOCK_SIZE)return 'error';
+  for(let i=0;i<data.length;i++)memory[pos+i]=data.charCodeAt(i);
+  return data.length+' bytes written to M';
+}
+function readMem(pos,count){
+  if(pos<0||count<0||pos+count>BLOCK_SIZE)return 'error';
+  let s='';for(let i=0;i<count;i++){const b=memory[pos+i];if(b)s+=String.fromCharCode(b);}
+  return s||'(empty)';
+}
+
+/* ── Render ── */
+function renderAll(changedBlocks){
+  renderBitmap(changedBlocks||[]);
+  renderOFT();renderDir();renderMem();renderStats();
+}
+
+function renderBitmap(changed){
+  const g=document.getElementById('bitmap');g.innerHTML='';
+  for(let i=0;i<BLOCK_COUNT;i++){
+    const d=document.createElement('div');
+    const cls='bblock '+(i<DATA_START?'sys':bitmap[i]?'used':'free');
+    d.className=cls+(changed.includes(i)?' new-used':'');
+    d.textContent=i;
+    d.title='Block '+i+(i<DATA_START?' (system)':bitmap[i]?' (used)':' (free)');
+    g.appendChild(d);
+  }
+}
+
+function renderOFT(){
+  const tb=document.getElementById('oft-body');tb.innerHTML='';
+  for(let i=0;i<OFT_SIZE;i++){
+    const e=oft[i];const tr=document.createElement('tr');
+    let badge,nameCell,pos,size,desc;
+    if(i===0){
+      badge=`<span class="slot-badge badge-dir">DIR</span>`;
+      nameCell=`<span class="slot-dir">[directory]</span>`;
+      pos=e.pos;size=e.size;desc=0;
+    }else if(e.pos!==-1){
+      badge=`<span class="slot-badge badge-open">OPEN</span>`;
+      nameCell=`<span class="slot-open">${getName(i,e.desc)}</span>`;
+      pos=e.pos;size=e.size;desc=e.desc;
+    }else{
+      badge=`<span class="slot-badge badge-free">FREE</span>`;
+      nameCell=`<span class="slot-free">—</span>`;
+      pos='—';size='—';desc='—';
+    }
+    tr.innerHTML=`<td>${i}</td><td>${badge}</td><td>${nameCell}</td><td>${pos}</td><td>${size}</td><td>${desc}</td>`;
+    tb.appendChild(tr);
+  }
+}
+
+function renderDir(){
+  const tb=document.getElementById('dir-body');tb.innerHTML='';
+  const count=Math.floor(oft[0].size/ENTRY_SIZE);
+  if(!count){
+    tb.innerHTML=`<tr><td colspan="4" style="padding:10px 8px"><span class="dir-empty">no files</span></td></tr>`;
+    return;
+  }
+  for(let i=0;i<count;i++){
+    const base=i*ENTRY_SIZE;let n='';
+    for(let j=0;j<4;j++){const c=oft[0].buffer[base+j];if(c)n+=String.fromCharCode(c);}
+    const di=oft[0].buffer[base+4];
+    const d=descriptors[di];
+    const blocks=d.blocks.filter(b=>b>0).join(', ')||'—';
+    const tr=document.createElement('tr');
+    tr.innerHTML=`<td class="filename">${n}</td><td class="desc-idx">${di}</td><td class="file-size">${d.size}</td><td class="desc-idx">${blocks}</td>`;
+    tb.appendChild(tr);
+  }
+}
+
+function renderMem(){
+  const g=document.getElementById('mem-grid');g.innerHTML='';
+  for(let i=0;i<64;i++){
+    const d=document.createElement('div');
+    d.className='mbyte'+(memory[i]?' active':'');
+    d.textContent=memory[i]?String.fromCharCode(memory[i]):'·';
+    d.title='M['+i+']='+memory[i];
+    g.appendChild(d);
+  }
+  let s='';for(let i=0;i<BLOCK_SIZE;i++){if(memory[i])s+=String.fromCharCode(memory[i]);}
+  const el=document.getElementById('mem-str');
+  el.textContent=s?'"'+s+'"':'(empty)';
+}
+
+function renderStats(){
+  let free=0;for(let i=DATA_START;i<BLOCK_COUNT;i++)if(!bitmap[i])free++;
+  const files=Math.floor(oft[0].size/ENTRY_SIZE);
+  let open=0;for(let i=1;i<OFT_SIZE;i++)if(oft[i].pos!==-1)open++;
+  document.getElementById('s-free').textContent=free;
+  document.getElementById('s-files').textContent=files;
+  document.getElementById('s-open').textContent=open;
+}
+
+function classifyResult(result){
+  if(result==='error')return 'log-result-err';
+  if(result.includes('initialized')||result.includes('created')||result.includes('opened')||result.includes('written')||result.includes('read')||result.includes('position')||result.includes('closed')||result.includes('destroyed'))return 'log-result-ok';
+  return 'log-result-info';
+}
+
+function addLog(cmd,result){
+  const log=document.getElementById('log');
+  const first=log.querySelector('.log-welcome');
+  if(first)first.remove();
+  const div=document.createElement('div');
+  div.className='log-entry';
+  div.innerHTML=`<span class="log-prompt">$</span><span class="log-cmd">${cmd}</span><span class="${classifyResult(result)}">${result}</span>`;
+  log.appendChild(div);
+  log.scrollTop=log.scrollHeight;
+}
+
+function run(){
+  const inp=document.getElementById('cmd');
+  const val=inp.value.trim();if(!val)return;
+  const before=bitmap.slice();
+  const result=dispatch(val);
+  const changed=[];for(let i=DATA_START;i<BLOCK_COUNT;i++)if(!before[i]&&bitmap[i])changed.push(i);
+  addLog(val,result);
+  renderAll(changed);
+  inp.value='';inp.focus();
+}
+
+function resetFS(){
+  document.getElementById('log').innerHTML='<div class="log-welcome">System reset. Ready.</div>';
+  initFS();renderAll([]);
+}
+
+function hint(v){
+  document.getElementById('cmd').value=v;
+  document.getElementById('cmd').focus();
+}
+
+initFS();renderAll([]);
+document.getElementById('cmd').focus();
+</script>
+</body>
+</html>
